@@ -1,54 +1,133 @@
-# Android
+set -e
+cd "$(git rev-parse --show-toplevel)"
 
-Repository ini merupakan proyek Android yang dapat dikembangkan lebih lanjut sesuai kebutuhan aplikasi yang ingin dibangun.
+npm init -y >/dev/null
+npm i -D @capacitor/cli@6.2.3 >/dev/null
+npm i @capacitor/core@6.2.3 @capacitor/android@6.2.3 >/dev/null
 
-## Deskripsi
+cat > capacitor.config.json <<'EOF'
+{
+  "appId": "com.satuproyeksi.reconciler",
+  "appName": "Reconciler",
+  "webDir": "www",
+  "server": {
+    "url": "https://andalanpratamaindonesia.com/recon/pilihan.php",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
+EOF
+mkdir -p www && echo '<!doctype html><meta charset="utf-8"><title>Reconciler</title><p>Memuat...</p>' > www/index.html
 
-Project ini dibuat untuk menampung source code Android, baik untuk aplikasi sederhana maupun aplikasi yang lebih kompleks. Struktur repository dapat diperluas sesuai kebutuhan, mulai dari UI, business logic, data layer, hingga integrasi API.
+npx cap add android
 
-## Struktur Proyek
+mkdir -p android/app/src/main/res/xml
+cat > android/app/src/main/AndroidManifest.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-```text
-Android/
-├── app/
-│   ├── src/
-│   ├── build.gradle
-│   └── proguard-rules.pro
-├── gradle/
-├── build.gradle
-├── settings.gradle
-├── gradlew
-├── gradlew.bat
-├── README.md
-└── .gitignore
-```
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-## Teknologi yang Umum Digunakan
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
-- Kotlin / Java
-- Android SDK
-- Jetpack Components
-- ViewModel, LiveData, Room, Navigation
-- Retrofit / OkHttp untuk API
-- Material Design
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Reconciler"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="false">
 
-## Cara Menjalankan
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:label="Reconciler"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
+cat > android/app/src/main/res/xml/network_security_config.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">andalanpratamaindonesia.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
+EOF
 
-1. Pastikan Android Studio telah terinstal.
-2. Clone repository ini.
-3. Buka project di Android Studio.
-4. Sync Gradle.
-5. Jalankan aplikasi di emulator atau perangkat Android.
+mkdir -p .github/workflows
+cat > .github/workflows/build-apk.yml <<'EOF'
+name: Build APK
 
-```bash
-git clone https://github.com/xgloryplay/Android.git
-cd Android
-```
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
-## Kontribusi
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-Pull request dan kontribusi sangat diterima. Silakan buat branch baru untuk setiap perubahan dan pastikan kode tetap rapi dan terdokumentasi dengan baik.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-## Lisensi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-Belum ditentukan. Silakan sesuaikan lisensi sesuai kebutuhan proyek.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+EOF
+
+cat >> .gitignore <<'EOF'
+node_modules/
+android/app/build/
+android/.gradle/
+android/local.properties
+EOF
+
+git add -A
+git commit -m "Setup APK Reconciler: Capacitor, izin kamera & GPS, workflow build"
+git push origin HEAD
+echo "Selesai. Pantau build di tab Actions."
