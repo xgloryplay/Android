@@ -1,0 +1,10 @@
+{
+  "appId": "com.satuproyeksi.reconciler",
+  "appName": "Reconciler",
+  "webDir": "www",
+  "server": {
+    "url": "https://andalanpratamaindonesia.com/recon/pilihan.php",
+    "androidScheme": "https",
+    "cleartext": false
+  }
+}
